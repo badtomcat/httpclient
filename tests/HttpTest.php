@@ -1,9 +1,5 @@
 <?php
 
-
-use Badtomcat\Routing\RequestContext;
-use Badtomcat\Routing\Exception\MethodNotAllowedException;
-
 class HttpTest extends PHPUnit_Framework_TestCase
 {
 
