@@ -13,6 +13,8 @@ namespace Badtomcat\Httpclient;
 class Curl
 {
     const DEF_UA = 'badtomcat/1.0';
+    const REQUEST_DATA_TYPE_FORMDATA = 0x1;
+    const REQUEST_DATA_TYPE_JSON = 0x2;
     protected $curl;
     public $msg;
     public $errorno;
@@ -20,36 +22,56 @@ class Curl
     public $cookie; // cookie保存路径
     public $timeout = 10;
     public $headers = [];
+    public $requestDataType = self::REQUEST_DATA_TYPE_FORMDATA;
 
     public function __construct()
     {
         $this->curl = curl_init();
     }
 
+    /**
+     * @return $this
+     */
     public function setUaAsMobile()
     {
         $this->ua = 'Mozilla/5.0 (iPhone; CPU iPhone OS 9_1 like Mac OS X) AppleWebKit/601.1.46 (KHTML, like Gecko) Version/9.0 Mobile/13B143 Safari/601.1';
         return $this;
     }
 
+    /**
+     * @return $this
+     */
     public function setUaAsPc()
     {
         $this->ua = "Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/63.0.3239.84 Safari/537.36";
         return $this;
     }
 
+    /**
+     * @return $this
+     */
     public function resetUa()
     {
         $this->ua = "badtomcat/1.0";
         return $this;
     }
 
+    /**
+     * @param $option
+     * @param $value
+     * @return $this
+     */
     public function setOption($option, $value)
     {
         curl_setopt($this->curl, $option, $value);
         return $this;
     }
 
+    /**
+     * 格式为key value形式
+     * @param array $headers
+     * @return $this
+     */
     public function setHeaders(array $headers)
     {
         $this->headers = $headers;
@@ -60,6 +82,11 @@ class Curl
         return $this;
     }
 
+    /**
+     * @param $key
+     * @param $val
+     * @return $this
+     */
     public function addHeader($key, $val)
     {
         $this->headers[$key] = $val;
@@ -77,7 +104,11 @@ class Curl
         return $ret;
     }
 
-    protected function perform()
+    /**
+     * 返回请求内容,FALSE为有错误
+     * @return bool|mixed
+     */
+    public function send()
     {
         $content = curl_exec($this->curl);
         $this->errorno = curl_errno($this->curl);
@@ -90,120 +121,95 @@ class Curl
     }
 
     /**
-     * CURL-get方式获取数据
-     *
-     * @param string $url URL
+     * @param $url
      * @param null $headers
-     * @return bool|mixed
+     * @return Curl
      */
     public function get($url, $headers = null)
     {
-        if (!$url)
-            return false;
-
-        $this->setOption(CURLOPT_URL, $url);
-        $this->setOption(CURLOPT_COOKIEJAR, $this->cookie);
-        $this->setOption(CURLOPT_COOKIEFILE, $this->cookie);
-        $this->setOption(CURLOPT_USERAGENT, $this->ua);
-        $this->setOption(CURLOPT_RETURNTRANSFER, 1);
-        if (is_array($headers)) {
-            $this->setHeaders($headers);
-        }
-        $this->setOption(CURLOPT_TIMEOUT, $this->timeout);
-        return $this->perform();
+        return $this->request("get", $url, null, $headers);
     }
 
-    /**
-     * CURL-post方式获取数据
-     *
-     * @param string $url
-     *            URL
+    /**+
+     * @param $url
      * @param array $data
-     *            POST数据
      * @param null $headers
-     * @return bool|mixed
+     * @return Curl
      */
     public function post($url, $data = [], $headers = null)
     {
-        if (!$url)
-            return false;
-        $data = (is_array($data)) ? http_build_query($data) : $data;
-
-        $this->setOption(CURLOPT_URL, $url);
-        $this->setOption(CURLOPT_COOKIEJAR, $this->cookie);
-        $this->setOption(CURLOPT_COOKIEFILE, $this->cookie);
-        $this->setOption(CURLOPT_USERAGENT, $this->ua);
-        $this->setOption(CURLOPT_POST, true);
-        $this->setOption(CURLOPT_POSTFIELDS, $data);
-        $this->setOption(CURLOPT_RETURNTRANSFER, 1);
-        if (is_array($headers)) {
-            $this->setHeaders($headers);
-        }
-        $this->setOption(CURLOPT_TIMEOUT, $this->timeout);
-        return $this->perform();
+        return $this->request("post", $url, $data, $headers);
     }
 
     /**
-     * CURL-put方式获取数据
-     *
-     * @param string $url
-     *            URL
+     * @param $url
      * @param array $data
-     *            POST数据
      * @param null $headers
-     * @return bool|mixed
+     * @return Curl
      */
     public function put($url, $data = [], $headers = null)
     {
-        if (!$url)
-            return false;
-        $data = (is_array($data)) ? http_build_query($data) : $data;
-
-        $this->setOption(CURLOPT_URL, $url);
-        $this->setOption(CURLOPT_COOKIEJAR, $this->cookie);
-        $this->setOption(CURLOPT_COOKIEFILE, $this->cookie);
-        $this->setOption(CURLOPT_USERAGENT, $this->ua);
-        $this->setOption(CURLOPT_POST, true);
-        $this->setOption(CURLOPT_POSTFIELDS, $data);
-        if (is_array($headers)) {
-            $this->setHeaders($headers);
-        }
-        $this->setOption(CURLOPT_TIMEOUT, $this->timeout);
-        $this->setOption(CURLOPT_CUSTOMREQUEST, 'PUT');
-        $this->addHeader('Content-Length', strlen($data));
-        return $this->perform();
+        return $this->request("put", $url, $data, $headers);
     }
 
     /**
-     * CURL-DEL方式获取数据
-     *
-     * @param string $url
-     *            URL
+     * @param $url
      * @param array $data
-     *            POST数据
      * @param null $headers
-     * @return bool|mixed
+     * @return Curl
      */
     public function delete($url, $data = [], $headers = null)
     {
-        if (!$url)
-            return false;
-        $data = (is_array($data)) ? http_build_query($data) : $data;
+        return $this->request("delete", $url, $data, $headers);
+    }
 
+    /**
+     * @param $method
+     * @param $url
+     * @param null $data
+     * @param null $headers
+     * @return $this
+     */
+    protected function request($method, $url, $data = null, $headers = null)
+    {
+        if (!$url)
+            return $this;
+        if (is_array($headers)) {
+            $this->setHeaders($headers);
+        }
         $this->setOption(CURLOPT_URL, $url);
         $this->setOption(CURLOPT_COOKIEJAR, $this->cookie);
         $this->setOption(CURLOPT_COOKIEFILE, $this->cookie);
         $this->setOption(CURLOPT_USERAGENT, $this->ua);
-        $this->setOption(CURLOPT_POST, true);
-        $this->setOption(CURLOPT_POSTFIELDS, $data);
-        $this->setOption(CURLOPT_CUSTOMREQUEST, 'DELETE');
-        $this->addHeader('Content-Length', strlen($data));
-        if (is_array($headers)) {
-            $this->setHeaders($headers);
+        if (!is_null($data)) {
+            $data = $this->buildData($data);
+            $this->setOption(CURLOPT_POST, true);
+            $this->setOption(CURLOPT_POSTFIELDS, $data);
+            $this->addHeader('Content-Length', strlen($data));
+        }
+        $method = strtoupper($method);
+        switch ($method) {
+            case "PUT":
+            case "DELETE":
+                $this->setOption(CURLOPT_CUSTOMREQUEST, 'DELETE');
+                break;
         }
         $this->setOption(CURLOPT_TIMEOUT, $this->timeout);
-
         $this->setOption(CURLOPT_RETURNTRANSFER, 1);
-        return $this->perform();
+        return $this;
+    }
+
+    protected function buildData($data)
+    {
+        if (is_string($data))
+            return $data;
+        elseif (is_array($data)) {
+            if ($this->requestDataType == self::REQUEST_DATA_TYPE_FORMDATA) {
+                return http_build_query($data);
+            } elseif ($this->requestDataType == self::REQUEST_DATA_TYPE_JSON) {
+                return json_encode($data);
+            }
+        }
+        return '';
     }
 }
